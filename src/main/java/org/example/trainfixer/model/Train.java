@@ -9,4 +9,8 @@ public class Train {
     public void add(Wagon w) { wagons.addLast(w); }
     public LinkedList<Wagon> wagons() { return wagons; }
     public int size() { return wagons.size(); }
+
+    private int fullPasses;
+    public void setFullPasses(int n) { this.fullPasses = n; }
+    public int getFullPasses() { return fullPasses; }
 }

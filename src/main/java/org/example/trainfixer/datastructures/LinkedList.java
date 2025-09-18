@@ -25,7 +25,6 @@ public class LinkedList<T> {
         return cur.getValue();
     }
 
-    // Hjælpemetode til at erstatte hele listen (bruges af TrainFixer)
     public void replaceWith(LinkedList<T> other) {
         this.head = other.head;
         this.size = other.size;

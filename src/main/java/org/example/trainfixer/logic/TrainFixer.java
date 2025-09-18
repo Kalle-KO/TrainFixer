@@ -2,7 +2,12 @@ package org.example.trainfixer.logic;
 
 import org.example.trainfixer.datastructures.LinkedList;
 import org.example.trainfixer.datastructures.Node;
-import org.example.trainfixer.domain.*;
+import org.example.trainfixer.domain.CargoCar;
+import org.example.trainfixer.domain.DiningCar;
+import org.example.trainfixer.domain.Locomotive;
+import org.example.trainfixer.domain.SeatCar;
+import org.example.trainfixer.domain.SleeperCar;
+import org.example.trainfixer.domain.Wagon;
 import org.example.trainfixer.model.Train;
 
 import java.util.ArrayList;
@@ -19,60 +24,51 @@ public class TrainFixer {
         List<Wagon> cargos = new ArrayList<>();
 
         Node<Wagon> cur = train.wagons().head();
-        int n = 0;
         while (cur != null) {
             Wagon w = cur.getValue();
-            if (w instanceof Locomotive) locos.add(w);
-            else if (w instanceof SeatCar) seats.add(w);
-            else if (w instanceof SleeperCar) sleepers.add(w);
-            else if (w instanceof DiningCar) dinings.add(w);
-            else if (w instanceof CargoCar) cargos.add(w);
-            n++;
+            if (w instanceof Locomotive)       locos.add(w);
+            else if (w instanceof SeatCar)     seats.add(w);
+            else if (w instanceof SleeperCar)  sleepers.add(w);
+            else if (w instanceof DiningCar)   dinings.add(w);
+            else if (w instanceof CargoCar)    cargos.add(w);
             cur = cur.getNext();
         }
 
-        // 2) Lokomotiv-krav (<=10: 1 forrest; >10: 2 – forrest + bagerst)
-        int neededLocos = (n <= 10) ? 1 : 2;
-        if (locos.size() < neededLocos) {
-            // tilføj "manglende" lokomotiver
-            while (locos.size() < neededLocos) locos.add(new Locomotive());
-        } else if (locos.size() > neededLocos) {
-            // fjern overskydende
-            while (locos.size() > neededLocos) locos.remove(locos.size() - 1);
-        } // :contentReference[oaicite:9]{index=9}
+        // 2) Bestem behov ift. den ENDELIGE plan (inkl. evt. ny dining)
+        boolean addDining = !seats.isEmpty() && dinings.isEmpty();
+        int nonLoco = seats.size() + sleepers.size() + cargos.size() + dinings.size() + (addDining ? 1 : 0);
 
-        // 3) Spisevogn-krav: Hvis der er siddevogne og ingen spisevogn -> tilføj 1
-        if (!seats.isEmpty() && dinings.isEmpty()) {
-            dinings.add(new DiningCar());
-        } // :contentReference[oaicite:10]{index=10}
+        // total = nonLoco + neededLocos; regler: total <= 10 => 1 loko, ellers 2
+        int neededLocos = (nonLoco <= 9) ? 1 : 2;
 
-        // 4) Rekonstruktion (én ny liste i korrekt rækkefølge)
-        // Passagerblok: Seats + Dining + Sleepers (sleepers samlet)
-        // Placér Dining så Seats kan nå den uden at krydse Sleepers: sæt Dining foran Sleepers.
+        // Synk antal lokomotiver til præcis neededLocos
+        while (locos.size() < neededLocos) locos.add(new Locomotive());
+        while (locos.size() > neededLocos) locos.remove(locos.size() - 1);
+
+        // Tilføj manglende dining hvis påkrævet
+        if (addDining) dinings.add(new DiningCar());
+
+        // 3) Rekonstruktion i korrekt rækkefølge
         LinkedList<Wagon> rebuilt = new LinkedList<>();
 
         // forreste lokomotiv (hvis krævet)
         if (neededLocos >= 1) rebuilt.addLast(locos.get(0));
 
-        // passagerblok
-        for (Wagon s : seats) rebuilt.addLast(s);
+        // passagerblok: seats -> dinings -> sleepers (sleepers ender i én blok)
+        for (Wagon s : seats)   rebuilt.addLast(s);
         for (Wagon d : dinings) rebuilt.addLast(d);
-        for (Wagon s : sleepers) rebuilt.addLast(s);
+        for (Wagon s : sleepers)rebuilt.addLast(s);
 
-        // gods
-        for (Wagon c : cargos) rebuilt.addLast(c);
+        // gods bagest (før evt. bageste lokomotiv)
+        for (Wagon c : cargos)  rebuilt.addLast(c);
 
         // bageste lokomotiv (hvis krævet == 2)
         if (neededLocos == 2) rebuilt.addLast(locos.get(1));
 
-        // 5) Erstat togets liste
+        // 4) Erstat togets liste
         train.wagons().replaceWith(rebuilt);
-    }
 
-    /**
-     * Kompleksitet:
-     * - Tid: O(n). Ét pass for at bucket’e (trin 1) + ét pass for at bygge ny liste (trin 4).
-     * - Plads: O(n) til midlertidige buckets og den nye liste.
-     * - Gennemløb: 2 fulde gennemløb af toget i værste fald.
-     */
+        // 5) Tæl fulde gennemløb (1 pass for bucketting + 1 samlet pass for opbygning)
+        train.setFullPasses(2);
+    }
 }
